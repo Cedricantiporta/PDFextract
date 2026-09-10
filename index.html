@@ -46,9 +46,20 @@
   }
 
   .wrap {
-    max-width: 560px;
+    max-width: 1040px;
     margin: 0 auto;
     padding: 40px 20px 70px;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .col-left, .col-right { min-width: 0; }
+  @media (max-width: 860px) {
+    .layout { grid-template-columns: 1fr; }
   }
 
   /* Top bar: icon + title/subtitle, like the reference app header */
@@ -283,19 +294,60 @@
     word-break: break-word;
   }
 
-  .downloads { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
-  .downloads a {
-    display: inline-flex; align-items: center; gap: 6px;
+  .progress-track {
+    height: 8px;
+    background: #ececef;
+    border-radius: var(--radius-pill);
+    overflow: hidden;
+    margin-top: 14px;
+  }
+  .progress-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    border-radius: var(--radius-pill);
+    transition: width .3s var(--ease);
+  }
+  .progress-fill.indeterminate {
+    width: 40% !important;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    animation: indeterminate 1.1s ease-in-out infinite;
+  }
+  @keyframes indeterminate {
+    0% { transform: translateX(-120%); }
+    100% { transform: translateX(280%); }
+  }
+  .progress-label { font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+
+  .download-list { display: flex; flex-direction: column; gap: 8px; }
+  .download-item {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    animation: chip-in .28s var(--ease);
+  }
+  .download-item-info { min-width: 0; }
+  .download-item-name {
+    font-size: 13.5px; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  .download-item-sub { font-size: 11.5px; color: var(--muted-2); margin-top: 1px; }
+  .download-btn {
+    display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
     background: var(--ok-tint);
     color: var(--ok);
     text-decoration: none;
-    font-size: 13.5px;
+    font-size: 13px;
     font-weight: 600;
-    padding: 8px 14px;
+    padding: 7px 13px;
     border-radius: var(--radius-pill);
     transition: background .15s var(--ease);
   }
-  .downloads a:hover { background: #d9f0dd; }
+  .download-btn:hover { background: #d9f0dd; }
+
+  .empty-state { font-size: 13px; color: var(--muted-2); text-align: center; padding: 18px 0; }
 
   table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 14px; }
   th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--divider); }
@@ -330,71 +382,94 @@
     </div>
   </div>
 
-  <div class="setting-card">
-    <div class="setting-title">Gemini API key</div>
-    <div class="setting-control">
-      <div class="input-wrap">
-        <input type="password" id="apiKey" placeholder="AIza…" autocomplete="off" spellcheck="false">
-        <button type="button" class="eye-btn" id="toggleKeyVisibility" aria-label="Show key">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/>
-            <circle cx="12" cy="12" r="3"/>
-            <path class="slash" d="M2 2l20 20" stroke="currentColor"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-  </div>
+  <div class="layout">
+    <div class="col-left">
 
-  <div class="setting-card row-between">
-    <div class="setting-title">Remember on this device</div>
-    <input type="checkbox" id="rememberKey" class="switch-input" aria-label="Remember API key on this device" checked>
-  </div>
-
-  <div class="setting-card">
-    <div class="setting-title">PDF files</div>
-    <div class="setting-control">
-      <div class="dropzone" id="dropzone">
-        <input type="file" id="pdfFiles" accept="application/pdf" multiple hidden>
-        <div class="dz-icon">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 15V4M12 4l-4 4M12 4l4 4"/>
-            <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
-          </svg>
+      <div class="setting-card">
+        <div class="setting-title">Gemini API key</div>
+        <div class="setting-control">
+          <div class="input-wrap">
+            <input type="password" id="apiKey" placeholder="AIza…" autocomplete="off" spellcheck="false">
+            <button type="button" class="eye-btn" id="toggleKeyVisibility" aria-label="Show key">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/>
+                <circle cx="12" cy="12" r="3"/>
+                <path class="slash" d="M2 2l20 20" stroke="currentColor"/>
+              </svg>
+            </button>
+          </div>
         </div>
-        <div class="dz-title">Drag PDFs here</div>
-        <div class="dz-sub">or click to browse</div>
       </div>
-      <div class="chips" id="fileList"></div>
-      <button type="button" class="clear-link hidden" id="clearFiles">Clear all</button>
-    </div>
-  </div>
 
-  <div class="setting-card row-between">
-    <div class="setting-title">Run</div>
-    <div style="display:flex;align-items:center;gap:10px">
-      <span id="statusText" class="setting-desc" style="margin:0"></span>
-      <button class="primary" id="runBtn">Split &amp; Zip</button>
-    </div>
-  </div>
+      <div class="setting-card row-between">
+        <div class="setting-title">Remember on this device</div>
+        <input type="checkbox" id="rememberKey" class="switch-input" aria-label="Remember API key on this device" checked>
+      </div>
 
-  <div class="console hidden reveal" id="logCard">
-    <div class="console-bar">
-      <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
-      <span class="label">Progress</span>
-    </div>
-    <div class="log" id="logBox"></div>
-  </div>
+      <div class="setting-card">
+        <div class="setting-title">PDF files</div>
+        <div class="setting-control">
+          <div class="dropzone" id="dropzone">
+            <input type="file" id="pdfFiles" accept="application/pdf" multiple hidden>
+            <div class="dz-icon">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 15V4M12 4l-4 4M12 4l4 4"/>
+                <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
+              </svg>
+            </div>
+            <div class="dz-title">Drag PDFs here</div>
+            <div class="dz-sub">or click to browse</div>
+          </div>
+          <div class="chips" id="fileList"></div>
+          <button type="button" class="clear-link hidden" id="clearFiles">Clear all</button>
+        </div>
+      </div>
 
-  <div class="panel hidden reveal" id="resultsCard">
-    <div class="panel-section">
-      <label class="field-label">Downloads</label>
-      <div class="downloads" id="downloadsBox"></div>
-      <table id="resultsTable">
-        <thead><tr><th>File</th><th>Page</th><th>PO Number</th><th>Status</th></tr></thead>
-        <tbody id="resultsBody"></tbody>
-      </table>
-      <p class="footnote">Rows marked <strong>REVIEW</strong> couldn't be confidently read and are zipped as <code>PAGE_n_UNREADABLE.pdf</code> instead of being guessed &mdash; open that page and rename it by hand.</p>
+      <div class="setting-card row-between">
+        <div class="setting-title">Run</div>
+        <button class="primary" id="runBtn">Split &amp; Zip</button>
+      </div>
+
+    </div>
+
+    <div class="col-right">
+
+      <div class="setting-card">
+        <div class="row-between">
+          <div class="setting-title">Progress</div>
+          <button type="button" class="clear-link" id="clearResults">Clear list</button>
+        </div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-label" id="progressLabel">Idle — choose files and click Split &amp; Zip</div>
+      </div>
+
+      <div class="setting-card" id="downloadsCard">
+        <div class="setting-title">Downloads</div>
+        <div class="setting-control">
+          <div class="download-list" id="downloadsBox"></div>
+          <div class="empty-state" id="downloadsEmpty">Nothing to download yet</div>
+        </div>
+      </div>
+
+      <div class="console hidden reveal" id="logCard">
+        <div class="console-bar">
+          <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+          <span class="label">Log</span>
+        </div>
+        <div class="log" id="logBox"></div>
+      </div>
+
+      <div class="setting-card hidden reveal" id="resultsCard">
+        <div class="setting-title">Per-page detail</div>
+        <div class="setting-control">
+          <table id="resultsTable">
+            <thead><tr><th>File</th><th>Page</th><th>PO Number</th><th>Status</th></tr></thead>
+            <tbody id="resultsBody"></tbody>
+          </table>
+          <p class="footnote">Rows marked <strong>REVIEW</strong> couldn't be confidently read and are zipped as <code>PAGE_n_UNREADABLE.pdf</code> instead of being guessed &mdash; open that page and rename it by hand.</p>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -454,13 +529,35 @@ const els = {
   clearFiles: document.getElementById('clearFiles'),
   fileCountText: document.getElementById('fileCountText'),
   runBtn: document.getElementById('runBtn'),
-  statusText: document.getElementById('statusText'),
+  progressFill: document.getElementById('progressFill'),
+  progressLabel: document.getElementById('progressLabel'),
+  clearResults: document.getElementById('clearResults'),
+  downloadsCard: document.getElementById('downloadsCard'),
+  downloadsBox: document.getElementById('downloadsBox'),
+  downloadsEmpty: document.getElementById('downloadsEmpty'),
   logCard: document.getElementById('logCard'),
   logBox: document.getElementById('logBox'),
   resultsCard: document.getElementById('resultsCard'),
-  downloadsBox: document.getElementById('downloadsBox'),
   resultsBody: document.getElementById('resultsBody'),
 };
+
+let downloadUrls = [];
+
+function setProgress(done, total, label) {
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+  els.progressFill.classList.remove('indeterminate');
+  els.progressFill.style.width = pct + '%';
+  els.progressLabel.textContent = label;
+}
+
+function setProgressIndeterminate(label) {
+  els.progressFill.classList.add('indeterminate');
+  els.progressLabel.textContent = label;
+}
+
+function updateDownloadsEmptyState() {
+  els.downloadsEmpty.classList.toggle('hidden', els.downloadsBox.children.length > 0);
+}
 
 // Restore remembered key
 try {
@@ -629,9 +726,8 @@ async function callGemini(apiKey, base64Pdf, pageCount) {
   return poValues;
 }
 
-async function splitAndZip(file, poValues, manifestRows) {
+async function splitAndZip(fileName, srcBytes, poValues, manifestRows, onPage) {
   const { PDFDocument } = PDFLib;
-  const srcBytes = await file.arrayBuffer();
   const srcDoc = await PDFDocument.load(srcBytes);
   const pageCount = srcDoc.getPageCount();
   const zip = new JSZip();
@@ -653,28 +749,65 @@ async function splitAndZip(file, poValues, manifestRows) {
     const pdfBytes = await newDoc.save();
     zip.file(name, pdfBytes);
 
-    manifestRows.push({ source: file.name, page: pageNum, po: raw, status, zip_entry: name });
+    manifestRows.push({ source: fileName, page: pageNum, po: raw, status, zip_entry: name });
     log(`  page ${pageNum}: ${po}  [${status}]`);
+    if (onPage) onPage();
   }
 
   const blob = await zip.generateAsync({ type: 'blob' });
   return blob;
 }
 
-function triggerDownload(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 4000);
-}
-
 function downloadIconSvg() {
   return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>';
 }
+
+// Adds a row to the Downloads list. Nothing downloads automatically --
+// the blob URL just sits on the "Download" button until the person clicks it.
+function addDownloadEntry(filename, blob, subtitle) {
+  const url = URL.createObjectURL(blob);
+  downloadUrls.push(url);
+
+  const item = document.createElement('div');
+  item.className = 'download-item';
+
+  const info = document.createElement('div');
+  info.className = 'download-item-info';
+  const name = document.createElement('div');
+  name.className = 'download-item-name';
+  name.textContent = filename;
+  const sub = document.createElement('div');
+  sub.className = 'download-item-sub';
+  sub.textContent = subtitle;
+  info.appendChild(name);
+  info.appendChild(sub);
+
+  const a = document.createElement('a');
+  a.className = 'download-btn';
+  a.href = url;
+  a.download = filename;
+  a.innerHTML = `${downloadIconSvg()}Download`;
+
+  item.appendChild(info);
+  item.appendChild(a);
+  els.downloadsBox.appendChild(item);
+  updateDownloadsEmptyState();
+}
+
+function clearResultsUI() {
+  downloadUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} });
+  downloadUrls = [];
+  els.downloadsBox.innerHTML = '';
+  updateDownloadsEmptyState();
+  els.logBox.textContent = '';
+  els.logCard.classList.add('hidden');
+  els.resultsBody.innerHTML = '';
+  els.resultsCard.classList.add('hidden');
+  setProgress(0, 0, 'Idle — choose files and click Split & Zip');
+}
+
+els.clearResults.addEventListener('click', clearResultsUI);
+updateDownloadsEmptyState();
 
 function renderResults(manifestRows) {
   els.resultsCard.classList.remove('hidden');
@@ -702,61 +835,64 @@ els.runBtn.addEventListener('click', async () => {
   if (!files.length) { alert('Choose at least one PDF first.'); return; }
 
   els.runBtn.disabled = true;
-  els.statusText.textContent = 'Working…';
-  els.logBox.textContent = '';
-  els.downloadsBox.innerHTML = '';
-  els.resultsCard.classList.add('hidden');
+  clearResultsUI();
+  setProgressIndeterminate('Reading file sizes…');
 
   const manifestRows = [];
 
   try {
+    // Pre-read every file once and total up pages so the progress bar has a
+    // real denominator across the whole batch, not just per-file.
+    const fileMeta = [];
+    let totalPages = 0;
     for (const file of files) {
-      log(`Processing ${file.name} ...`);
-      const srcBytes = await file.arrayBuffer();
-      const { PDFDocument } = PDFLib;
-      const probeDoc = await PDFDocument.load(srcBytes.slice(0));
-      const pageCount = probeDoc.getPageCount();
+      const bytes = await file.arrayBuffer();
+      const doc = await PDFLib.PDFDocument.load(bytes.slice(0));
+      const pageCount = doc.getPageCount();
+      fileMeta.push({ name: file.name, bytes, pageCount });
+      totalPages += pageCount;
+    }
+
+    let donePages = 0;
+    setProgress(0, totalPages, `0 / ${totalPages} pages`);
+
+    for (const meta of fileMeta) {
+      log(`Processing ${meta.name} ...`);
+      setProgressIndeterminate(`Reading ${meta.name} with Gemini…`);
 
       let poValues;
       try {
-        const base64Pdf = arrayBufferToBase64(srcBytes);
-        poValues = await callGemini(apiKey, base64Pdf, pageCount);
+        const base64Pdf = arrayBufferToBase64(meta.bytes);
+        poValues = await callGemini(apiKey, base64Pdf, meta.pageCount);
       } catch (e) {
         log(`  Gemini call failed: ${e.message}`);
         poValues = {};
-        for (let p = 1; p <= pageCount; p++) poValues[p] = 'UNREADABLE';
+        for (let p = 1; p <= meta.pageCount; p++) poValues[p] = 'UNREADABLE';
       }
 
-      const zipBlob = await splitAndZip(file, poValues, manifestRows);
-      const zipName = file.name.replace(/\.pdf$/i, '') + '_BOLs_by_PO.zip';
-      triggerDownload(zipBlob, zipName);
-
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(zipBlob);
-      link.download = zipName;
-      link.innerHTML = `${downloadIconSvg()}${zipName}`;
-      els.downloadsBox.appendChild(link);
+      const zipBlob = await splitAndZip(meta.name, meta.bytes, poValues, manifestRows, () => {
+        donePages++;
+        setProgress(donePages, totalPages, `${donePages} / ${totalPages} pages`);
+      });
+      const zipName = meta.name.replace(/\.pdf$/i, '') + '_BOLs_by_PO.zip';
+      const reviewInFile = manifestRows.filter(r => r.source === meta.name && r.status === 'REVIEW').length;
+      addDownloadEntry(zipName, zipBlob, `${meta.pageCount} page${meta.pageCount === 1 ? '' : 's'}${reviewInFile ? ` · ${reviewInFile} flagged` : ''}`);
 
       log(`Wrote ${zipName}`);
     }
 
     const csv = manifestToCsv(manifestRows);
     const csvBlob = new Blob([csv], { type: 'text/csv' });
-    triggerDownload(csvBlob, 'manifest.csv');
-    const csvLink = document.createElement('a');
-    csvLink.href = URL.createObjectURL(csvBlob);
-    csvLink.download = 'manifest.csv';
-    csvLink.innerHTML = `${downloadIconSvg()}manifest.csv`;
-    els.downloadsBox.appendChild(csvLink);
+    addDownloadEntry('manifest.csv', csvBlob, `${manifestRows.length} rows`);
 
     renderResults(manifestRows);
 
     const reviewCount = manifestRows.filter(r => r.status === 'REVIEW').length;
-    els.statusText.textContent = `Done — ${manifestRows.length} pages, ${reviewCount} flagged for review.`;
+    setProgress(totalPages, totalPages, `Done — ${manifestRows.length} pages, ${reviewCount} flagged for review`);
     log(`\nDone. ${manifestRows.length} pages processed, ${reviewCount} flagged REVIEW.`);
   } catch (e) {
     log(`ERROR: ${e.message}`);
-    els.statusText.textContent = 'Error — see log.';
+    els.progressLabel.textContent = 'Error — see log.';
   } finally {
     els.runBtn.disabled = false;
   }
