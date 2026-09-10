@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOL Splitter</title>
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #d8dce1;
+    --text: #1c2126;
+    --muted: #6b7280;
+    --accent: #2d6cdf;
+    --accent-hover: #2559b8;
+    --ok: #1a7f37;
+    --review: #b45309;
+    --error: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+  }
+  .wrap {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 32px 20px 60px;
+  }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 28px; font-size: 14px; }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 18px;
+  }
+  .step-label { font-weight: 600; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 10px; }
+  label { display: block; font-size: 13px; margin-bottom: 6px; color: var(--text); }
+  input[type=text], input[type=password] {
+    width: 100%;
+    padding: 9px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  input[type=file] { font-size: 14px; }
+  .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  .row label { margin: 0; font-size: 13px; color: var(--muted); }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { background: var(--accent-hover); }
+  button:disabled { background: #a9b6c9; cursor: not-allowed; }
+  button.secondary {
+    background: transparent;
+    color: var(--accent);
+    border: 1px solid var(--accent);
+  }
+  button.secondary:hover { background: #eef3fc; }
+  .filelist { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .log {
+    background: #0f1115;
+    color: #d7dbe0;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 12.5px;
+    border-radius: 8px;
+    padding: 14px;
+    max-height: 260px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 600; }
+  .status-OK { color: var(--ok); font-weight: 600; }
+  .status-REVIEW { color: var(--review); font-weight: 600; }
+  .downloads a {
+    display: inline-block;
+    margin: 4px 8px 4px 0;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .downloads a:hover { text-decoration: underline; }
+  .note { font-size: 12.5px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>BOL Splitter</h1>
+  <p class="sub">Splits scanned Bill-of-Lading PDFs by page, reads each page's PO number with Gemini, renames the page to that PO number, zips per source PDF. Runs entirely in your browser — files never leave your machine except the PDF sent to Google's Gemini API.</p>
+
+  <div class="card">
+    <div class="step-label">1. Gemini API key</div>
+    <label for="apiKey">Free key from aistudio.google.com &rarr; "Get API key"</label>
+    <input type="password" id="apiKey" placeholder="AIza...">
+    <div class="row">
+      <input type="checkbox" id="rememberKey">
+      <label for="rememberKey">Remember on this device (saved only in this browser)</label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="step-label">2. Choose PDF(s)</div>
+    <input type="file" id="pdfFiles" accept="application/pdf" multiple>
+    <div class="filelist" id="fileList"></div>
+  </div>
+
+  <div class="card">
+    <div class="step-label">3. Run</div>
+    <button id="runBtn">Split &amp; Zip</button>
+    <span id="statusText" class="note"></span>
+  </div>
+
+  <div class="card hidden" id="logCard">
+    <div class="step-label">Progress</div>
+    <div class="log" id="logBox"></div>
+  </div>
+
+  <div class="card hidden" id="resultsCard">
+    <div class="step-label">Downloads</div>
+    <div class="downloads" id="downloadsBox"></div>
+    <table id="resultsTable">
+      <thead><tr><th>File</th><th>Page</th><th>PO Number</th><th>Status</th></tr></thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+    <p class="note">Rows marked REVIEW couldn't be confidently read and are zipped as PAGE_n_UNREADABLE.pdf instead of being guessed — open that page and rename it by hand.</p>
+  </div>
+</div>
+
+<script>
+const PROMPT = `ROLE
+You are a meticulous document-data-entry specialist processing scanned Bill of Lading (BOL) PDFs for a logistics operation. Your job is to extract one identifier per page — the PO number — with zero tolerance for guessing. Wrong output causes mislabeled freight paperwork downstream, so an explicit "UNREADABLE" is always preferred over a plausible-looking wrong answer.
+
+INPUT
+A multi-page scanned PDF. Each page is one BOL document. Pages may not all use the same template — treat every page independently, do not assume the whole file is uniform.
+
+WHERE TO FIND THE PO NUMBER (check in this order, use whichever matches the page)
+
+Template A — Standard Amazon Freight BOL:
+Look for a table titled "CUSTOMER ORDER INFORMATION" with column headers ORDER NO | PO NO | EXT NO | #PKGS | WEIGHT | PALLET/SLIP | ADDITIONAL SHIPPER INFO. The PO number is the value in the "PO NO" column, first data row. It is typically an 8-character uppercase alphanumeric code (e.g. "8BM4Q5FF"). If multiple data rows have values, use the first non-empty row only — one PO number per page.
+
+Template B — Amazon BOL with merged order column:
+Look for a table titled "CUSTOMER ORDER INFORMATION" but with a single column "CUSTOMER ORDER NUMBER" (no separate PO NO / EXT NO columns). The PO number is the value in that column, first data row. Same 8-character alphanumeric format.
+
+Template C — Generic "Straight Bill of Lading – Short Form":
+Look for a small table with column header "Type/ Reference #" containing the literal label "PO:" followed by a number on the next line — this is usually purely numeric, 8 digits (e.g. "11635249"), no letters. Use that number as the PO number for that page. Do not confuse it with "Load#", "Ship ID#", "Reference Number", or a handwritten number scrawled at the top of the page (e.g. "B2908800") — those are NOT the PO number.
+
+If a page matches none of these templates, or the relevant field is blank, torn, or covered by a stamp/signature, output "UNREADABLE" — do not guess based on nearby fields.
+
+CHARACTER DISAMBIGUATION (critical — this is where most errors happen)
+Scanned BOLs use a font where these pairs are easy to confuse. For every character in the PO number, actively check it against an unambiguous reference character elsewhere on the SAME page before deciding:
+- "O" (letter) vs "0" (zero): compare against the "O" in "ORDER", "CUSTOMER", or "PO" printed elsewhere on the page. Amazon-format PO codes in this dataset consistently use the letter O, not zero — if genuinely ambiguous, prefer O.
+- "I" (letter) vs "1" (digit) vs "l" (lowercase L): in this font, digit "1" typically has a small serif/foot at top and/or base; letter "I" is usually a plain vertical bar with no serif. Check stroke width and serifs before deciding.
+- "S" vs "5", "B" vs "8", "Z" vs "2": use surrounding context and letterform curvature (5 has a flat top and square corner; S is fully curved).
+Never resolve ambiguity by "what looks like a common PO format" — resolve it by comparing actual glyph shapes on that specific page.
+
+OUTPUT FORMAT
+Return ONLY a JSON array, one object per page, in page order:
+[{"page": 1, "po_number": "8BM4Q5FF", "template": "A"}, ...]
+
+RULES
+- Process every single page. Do not skip, merge, summarize, or omit any page for any reason.
+- One object per page, even if the PO number repeats across pages or a page seems irrelevant/blank.
+- "template" is "A", "B", or "C" per the definitions above, or null if UNREADABLE.
+- Never fabricate a PO number. If confidence is not high, output "UNREADABLE" rather than a best guess.
+- Do not include the ORDER NO, EXT NO, Load#, Pro#, Ship ID#, BOL number, or any other field as the po_number — only the specific field defined above per template.
+- If the PDF has N pages, your output array must have exactly N objects.`;
+
+const MODEL = "gemini-2.5-flash";
+const PO_PATTERN = /^[A-Z0-9]{4,16}$/;
+
+const els = {
+  apiKey: document.getElementById('apiKey'),
+  rememberKey: document.getElementById('rememberKey'),
+  pdfFiles: document.getElementById('pdfFiles'),
+  fileList: document.getElementById('fileList'),
+  runBtn: document.getElementById('runBtn'),
+  statusText: document.getElementById('statusText'),
+  logCard: document.getElementById('logCard'),
+  logBox: document.getElementById('logBox'),
+  resultsCard: document.getElementById('resultsCard'),
+  downloadsBox: document.getElementById('downloadsBox'),
+  resultsBody: document.getElementById('resultsBody'),
+};
+
+// Restore remembered key
+try {
+  const saved = localStorage.getItem('bol_gemini_key');
+  if (saved) { els.apiKey.value = saved; els.rememberKey.checked = true; }
+} catch (e) {}
+
+els.rememberKey.addEventListener('change', () => {
+  try {
+    if (els.rememberKey.checked && els.apiKey.value) {
+      localStorage.setItem('bol_gemini_key', els.apiKey.value);
+    } else {
+      localStorage.removeItem('bol_gemini_key');
+    }
+  } catch (e) {}
+});
+els.apiKey.addEventListener('input', () => {
+  try {
+    if (els.rememberKey.checked) localStorage.setItem('bol_gemini_key', els.apiKey.value);
+  } catch (e) {}
+});
+
+els.pdfFiles.addEventListener('change', () => {
+  const files = Array.from(els.pdfFiles.files);
+  els.fileList.textContent = files.length
+    ? files.map(f => f.name).join(', ')
+    : '';
+});
+
+function log(msg) {
+  els.logCard.classList.remove('hidden');
+  els.logBox.textContent += msg + "\n";
+  els.logBox.scrollTop = els.logBox.scrollHeight;
+}
+
+function arrayBufferToBase64(buf) {
+  let binary = '';
+  const bytes = new Uint8Array(buf);
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+async function callGemini(apiKey, base64Pdf, pageCount) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const body = {
+    contents: [{
+      parts: [
+        { inline_data: { mime_type: "application/pdf", data: base64Pdf } },
+        { text: PROMPT }
+      ]
+    }],
+    generationConfig: { response_mime_type: "application/json" }
+  };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Gemini API ${res.status}: ${errText.slice(0, 300)}`);
+  }
+  const json = await res.json();
+  let text = json.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) throw new Error('Gemini returned no content');
+  text = text.trim();
+  if (text.startsWith('```')) {
+    text = text.replace(/^```json/i, '').replace(/^```/, '').replace(/```$/, '').trim();
+  }
+  const data = JSON.parse(text);
+  if (!Array.isArray(data)) throw new Error('Model did not return a JSON array');
+
+  const poValues = {};
+  for (const entry of data) {
+    if (typeof entry.page !== 'number') continue;
+    let po = (entry.po_number || 'UNREADABLE').toUpperCase();
+    const template = entry.template;
+    if ((template === 'A' || template === 'B') && po !== 'UNREADABLE') {
+      po = po.replace(/0/g, 'O');
+    }
+    poValues[entry.page] = po;
+  }
+  for (let p = 1; p <= pageCount; p++) {
+    if (!(p in poValues)) poValues[p] = 'UNREADABLE';
+  }
+  return poValues;
+}
+
+async function splitAndZip(file, poValues, manifestRows) {
+  const { PDFDocument } = PDFLib;
+  const srcBytes = await file.arrayBuffer();
+  const srcDoc = await PDFDocument.load(srcBytes);
+  const pageCount = srcDoc.getPageCount();
+  const zip = new JSZip();
+  const seen = {};
+
+  for (let i = 0; i < pageCount; i++) {
+    const pageNum = i + 1;
+    let raw = (poValues[pageNum] || 'UNREADABLE').trim().toUpperCase();
+    const valid = raw !== 'UNREADABLE' && PO_PATTERN.test(raw);
+    const status = valid ? 'OK' : 'REVIEW';
+    const po = valid ? raw : `PAGE_${pageNum}_UNREADABLE`;
+
+    seen[po] = (seen[po] || 0) + 1;
+    const name = seen[po] === 1 ? `${po}.pdf` : `${po}_${seen[po]}.pdf`;
+
+    const newDoc = await PDFDocument.create();
+    const [copiedPage] = await newDoc.copyPages(srcDoc, [i]);
+    newDoc.addPage(copiedPage);
+    const pdfBytes = await newDoc.save();
+    zip.file(name, pdfBytes);
+
+    manifestRows.push({ source: file.name, page: pageNum, po: raw, status, zip_entry: name });
+    log(`  page ${pageNum}: ${po}  [${status}]`);
+  }
+
+  const blob = await zip.generateAsync({ type: 'blob' });
+  return blob;
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function renderResults(manifestRows) {
+  els.resultsCard.classList.remove('hidden');
+  els.resultsBody.innerHTML = '';
+  for (const r of manifestRows) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.source}</td><td>${r.page}</td><td>${r.po}</td><td class="status-${r.status}">${r.status}</td>`;
+    els.resultsBody.appendChild(tr);
+  }
+}
+
+function manifestToCsv(manifestRows) {
+  const header = 'source_pdf,page,po_value,status,zip_entry\n';
+  const lines = manifestRows.map(r =>
+    [r.source, r.page, r.po, r.status, r.zip_entry].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+  );
+  return header + lines.join('\n');
+}
+
+els.runBtn.addEventListener('click', async () => {
+  const apiKey = els.apiKey.value.trim();
+  const files = Array.from(els.pdfFiles.files);
+
+  if (!apiKey) { alert('Enter your Gemini API key first.'); return; }
+  if (!files.length) { alert('Choose at least one PDF first.'); return; }
+
+  els.runBtn.disabled = true;
+  els.statusText.textContent = 'Working...';
+  els.logBox.textContent = '';
+  els.downloadsBox.innerHTML = '';
+  els.resultsCard.classList.add('hidden');
+
+  const manifestRows = [];
+
+  try {
+    for (const file of files) {
+      log(`Processing ${file.name} ...`);
+      const srcBytes = await file.arrayBuffer();
+      const { PDFDocument } = PDFLib;
+      const probeDoc = await PDFDocument.load(srcBytes.slice(0));
+      const pageCount = probeDoc.getPageCount();
+
+      let poValues;
+      try {
+        const base64Pdf = arrayBufferToBase64(srcBytes);
+        poValues = await callGemini(apiKey, base64Pdf, pageCount);
+      } catch (e) {
+        log(`  Gemini call failed: ${e.message}`);
+        poValues = {};
+        for (let p = 1; p <= pageCount; p++) poValues[p] = 'UNREADABLE';
+      }
+
+      const zipBlob = await splitAndZip(file, poValues, manifestRows);
+      const zipName = file.name.replace(/\.pdf$/i, '') + '_BOLs_by_PO.zip';
+      triggerDownload(zipBlob, zipName);
+
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(zipBlob);
+      link.download = zipName;
+      link.textContent = `⬇ ${zipName}`;
+      els.downloadsBox.appendChild(link);
+
+      log(`Wrote ${zipName}`);
+    }
+
+    const csv = manifestToCsv(manifestRows);
+    const csvBlob = new Blob([csv], { type: 'text/csv' });
+    triggerDownload(csvBlob, 'manifest.csv');
+    const csvLink = document.createElement('a');
+    csvLink.href = URL.createObjectURL(csvBlob);
+    csvLink.download = 'manifest.csv';
+    csvLink.textContent = '⬇ manifest.csv';
+    els.downloadsBox.appendChild(csvLink);
+
+    renderResults(manifestRows);
+
+    const reviewCount = manifestRows.filter(r => r.status === 'REVIEW').length;
+    els.statusText.textContent = `Done. ${manifestRows.length} pages, ${reviewCount} flagged REVIEW.`;
+    log(`\nDone. ${manifestRows.length} pages processed, ${reviewCount} flagged REVIEW.`);
+  } catch (e) {
+    log(`ERROR: ${e.message}`);
+    els.statusText.textContent = 'Error — see log.';
+  } finally {
+    els.runBtn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
