@@ -4,144 +4,402 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>BOL Splitter</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect x='10' y='6' width='38' height='52' rx='7' fill='%230071e3'/%3E%3Crect x='18' y='18' width='22' height='3.4' rx='1.7' fill='white' opacity='.9'/%3E%3Crect x='18' y='27' width='22' height='3.4' rx='1.7' fill='white' opacity='.7'/%3E%3Crect x='18' y='36' width='14' height='3.4' rx='1.7' fill='white' opacity='.5'/%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <style>
   :root {
-    --bg: #f5f6f8;
+    --bg: #f5f5f7;
     --panel: #ffffff;
-    --border: #d8dce1;
-    --text: #1c2126;
-    --muted: #6b7280;
-    --accent: #2d6cdf;
-    --accent-hover: #2559b8;
-    --ok: #1a7f37;
-    --review: #b45309;
-    --error: #c0392b;
+    --divider: rgba(0,0,0,.08);
+    --text: #1d1d1f;
+    --muted: #6e6e73;
+    --muted-2: #98989d;
+    --accent: #0071e3;
+    --accent-hover: #0077ed;
+    --accent-active: #0068d1;
+    --accent-tint: #eaf3fe;
+    --ok: #1d7a34;
+    --ok-tint: #e7f6ea;
+    --review: #b5680a;
+    --review-tint: #fdf1e0;
+    --toggle-on: #30d158;
+    --card-border: #e7e8eb;
+    --shadow-sm: 0 1px 2px rgba(0,0,0,.04);
+    --shadow-md: 0 1px 3px rgba(0,0,0,.05), 0 10px 28px -8px rgba(0,0,0,.12);
+    --radius-panel: 16px;
+    --radius-field: 10px;
+    --radius-pill: 980px;
+    --ease: cubic-bezier(.32,.72,0,1);
   }
+
   * { box-sizing: border-box; }
+
   body {
     margin: 0;
-    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
-    background: var(--bg);
+    background:
+      radial-gradient(1100px 480px at 50% -180px, #ffffff 0%, var(--bg) 60%),
+      var(--bg);
     color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
+
   .wrap {
-    max-width: 760px;
+    max-width: 560px;
     margin: 0 auto;
-    padding: 32px 20px 60px;
+    padding: 40px 20px 70px;
   }
-  h1 { font-size: 22px; margin: 0 0 4px; }
-  .sub { color: var(--muted); margin: 0 0 28px; font-size: 14px; }
-  .card {
+
+  /* Top bar: icon + title/subtitle, like the reference app header */
+  .topbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 22px;
+  }
+  .topbar-icon {
+    width: 40px; height: 40px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 11px;
+    background: var(--accent);
+  }
+  .topbar-text { display: flex; flex-direction: column; gap: 1px; }
+  .topbar-title { font-size: 16px; font-weight: 650; letter-spacing: -0.01em; }
+  .topbar-sub { font-size: 12.5px; color: var(--muted); }
+
+  .sub {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.5;
+    margin: 0 0 22px;
+  }
+
+  /* Each setting lives in its own bordered rounded card, stacked with a gap
+     -- matching the reference UI rather than one grouped list. */
+  .setting-card {
     background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 18px;
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-panel);
+    padding: 16px 18px;
+    margin-bottom: 12px;
   }
-  .step-label { font-weight: 600; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 10px; }
-  label { display: block; font-size: 13px; margin-bottom: 6px; color: var(--text); }
+  .setting-title { font-size: 14.5px; font-weight: 650; color: var(--text); }
+  .setting-desc { font-size: 12.5px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+  .setting-control { margin-top: 12px; }
+
+  .hint {
+    font-size: 12.5px;
+    color: var(--muted-2);
+    margin: 6px 0 0;
+  }
+  .hint a { color: var(--accent); text-decoration: none; }
+  .hint a:hover { text-decoration: underline; }
+
+  .input-wrap { position: relative; }
   input[type=text], input[type=password] {
     width: 100%;
-    padding: 9px 10px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    font-size: 14px;
+    padding: 10px 38px 10px 12px;
+    border: 1px solid var(--card-border);
+    background: #fbfbfc;
+    border-radius: var(--radius-field);
+    font-size: 14.5px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--text);
+    transition: box-shadow .18s var(--ease), border-color .18s var(--ease);
   }
-  input[type=file] { font-size: 14px; }
-  .row { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-  .row label { margin: 0; font-size: 13px; color: var(--muted); }
-  button {
+  input[type=text]:focus, input[type=password]:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px var(--accent-tint);
+  }
+  input::placeholder { color: var(--muted-2); font-family: -apple-system, sans-serif; }
+
+  .eye-btn {
+    position: absolute;
+    right: 4px; top: 50%;
+    transform: translateY(-50%);
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent;
+    border: none;
+    border-radius: 8px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 0;
+  }
+  .eye-btn:hover { background: var(--divider); }
+  .eye-btn svg .slash { display: none; }
+  .eye-btn.is-visible svg .slash { display: block; }
+
+  .row-between {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+  .row-label { display: flex; flex-direction: column; gap: 2px; cursor: pointer; }
+  .row-label span:first-child { font-size: 14px; font-weight: 500; }
+  .row-sublabel { font-size: 12.5px; color: var(--muted-2); }
+
+  .switch-input {
+    appearance: none; -webkit-appearance: none;
+    width: 42px; height: 26px;
+    background: #e2e2e6;
+    border-radius: 999px;
+    position: relative;
+    cursor: pointer;
+    outline: none;
+    flex-shrink: 0;
+    transition: background .22s var(--ease);
+  }
+  .switch-input::before {
+    content: '';
+    position: absolute;
+    top: 2px; left: 2px;
+    width: 22px; height: 22px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 1px 3px rgba(0,0,0,.28), 0 1px 1px rgba(0,0,0,.12);
+    transition: transform .22s var(--ease);
+  }
+  .switch-input:checked { background: var(--toggle-on); }
+  .switch-input:checked::before { transform: translateX(16px); }
+
+  .dropzone {
+    border: 1.5px dashed #c7c7cc;
+    border-radius: 16px;
+    padding: 28px 20px;
+    text-align: center;
+    cursor: pointer;
+    background: #fbfbfc;
+    transition: border-color .2s var(--ease), background .2s var(--ease), transform .2s var(--ease);
+  }
+  .dropzone:hover { border-color: #a9a9ae; }
+  .dropzone.dragover {
+    border-color: var(--accent);
+    background: var(--accent-tint);
+    transform: scale(1.008);
+  }
+  .dropzone.has-files { padding: 18px 20px; }
+  .dz-icon { color: var(--muted-2); margin-bottom: 8px; transition: color .2s var(--ease); }
+  .dropzone.dragover .dz-icon { color: var(--accent); }
+  .dz-title { font-size: 14.5px; font-weight: 500; }
+  .dz-sub { font-size: 12.5px; color: var(--muted-2); margin-top: 2px; }
+
+  .chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .chip {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--accent-tint);
+    color: var(--accent);
+    border-radius: var(--radius-pill);
+    padding: 6px 8px 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    max-width: 100%;
+    animation: chip-in .28s var(--ease);
+  }
+  @keyframes chip-in { from { opacity: 0; transform: scale(.85); } to { opacity: 1; transform: scale(1); } }
+  .chip-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+  .chip-x {
+    background: rgba(0,113,227,.14);
+    border: none;
+    color: var(--accent);
+    width: 18px; height: 18px;
+    border-radius: 50%;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .chip-x:hover { background: rgba(0,113,227,.26); }
+
+  .run-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; }
+
+  button.primary {
     background: var(--accent);
     color: white;
     border: none;
-    padding: 10px 18px;
-    border-radius: 6px;
+    padding: 9px 20px;
+    border-radius: var(--radius-pill);
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
+    letter-spacing: -0.005em;
+    box-shadow: 0 1px 2px rgba(0,113,227,.25);
+    transition: background .15s var(--ease), transform .1s var(--ease);
   }
-  button:hover { background: var(--accent-hover); }
-  button:disabled { background: #a9b6c9; cursor: not-allowed; }
-  button.secondary {
-    background: transparent;
-    color: var(--accent);
-    border: 1px solid var(--accent);
+  button.primary:hover { background: var(--accent-hover); }
+  button.primary:active { background: var(--accent-active); transform: scale(.97); }
+  button.primary:disabled { background: #c7c7cc; box-shadow: none; cursor: not-allowed; }
+
+  .status-text { font-size: 13px; color: var(--muted); }
+
+  .clear-link {
+    background: none; border: none; color: var(--muted); font-size: 12.5px;
+    cursor: pointer; padding: 0; margin-top: 10px;
   }
-  button.secondary:hover { background: #eef3fc; }
-  .filelist { font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .clear-link:hover { color: var(--text); text-decoration: underline; }
+
+  .reveal {
+    opacity: 0; transform: translateY(8px);
+    animation: reveal-in .38s var(--ease) forwards;
+  }
+  @keyframes reveal-in { to { opacity: 1; transform: translateY(0); } }
+
+  .console {
+    background: #1c1c1e;
+    border-radius: var(--radius-panel);
+    box-shadow: var(--shadow-md);
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .console-bar {
+    display: flex; align-items: center; gap: 6px;
+    padding: 12px 14px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+  }
+  .console-bar .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .dot.red { background: #ff5f57; }
+  .dot.yellow { background: #febc2e; }
+  .dot.green { background: #28c840; }
+  .console-bar .label { margin-left: 6px; font-size: 12px; color: #98989d; }
   .log {
-    background: #0f1115;
     color: #d7dbe0;
-    font-family: ui-monospace, Consolas, monospace;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
     font-size: 12.5px;
-    border-radius: 8px;
-    padding: 14px;
-    max-height: 260px;
+    line-height: 1.6;
+    padding: 14px 16px;
+    max-height: 240px;
     overflow-y: auto;
     white-space: pre-wrap;
     word-break: break-word;
   }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
-  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
-  th { color: var(--muted); font-weight: 600; }
-  .status-OK { color: var(--ok); font-weight: 600; }
-  .status-REVIEW { color: var(--review); font-weight: 600; }
+
+  .downloads { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 4px; }
   .downloads a {
-    display: inline-block;
-    margin: 4px 8px 4px 0;
-    color: var(--accent);
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--ok-tint);
+    color: var(--ok);
     text-decoration: none;
-    font-size: 14px;
+    font-size: 13.5px;
     font-weight: 600;
+    padding: 8px 14px;
+    border-radius: var(--radius-pill);
+    transition: background .15s var(--ease);
   }
-  .downloads a:hover { text-decoration: underline; }
-  .note { font-size: 12.5px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
-  .hidden { display: none; }
+  .downloads a:hover { background: #d9f0dd; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 14px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--divider); }
+  th { color: var(--muted-2); font-weight: 600; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; }
+  td { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; }
+  .pill { display: inline-block; padding: 2px 9px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700; font-family: -apple-system, sans-serif; letter-spacing: .02em; }
+  .pill.OK { background: var(--ok-tint); color: var(--ok); }
+  .pill.REVIEW { background: var(--review-tint); color: var(--review); }
+
+  .footnote { font-size: 12.5px; color: var(--muted-2); line-height: 1.6; margin: 10px 2px 0; }
+  .hidden { display: none !important; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .reveal, .chip { animation: none !important; opacity: 1 !important; transform: none !important; }
+  }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>BOL Splitter</h1>
-  <p class="sub">Splits scanned Bill-of-Lading PDFs by page, reads each page's PO number with Gemini, renames the page to that PO number, zips per source PDF. Runs entirely in your browser — files never leave your machine except the PDF sent to Google's Gemini API.</p>
 
-  <div class="card">
-    <div class="step-label">1. Gemini API key</div>
-    <label for="apiKey">Free key from aistudio.google.com &rarr; "Get API key"</label>
-    <input type="password" id="apiKey" placeholder="AIza...">
-    <div class="row">
-      <input type="checkbox" id="rememberKey">
-      <label for="rememberKey">Remember on this device (saved only in this browser)</label>
+  <div class="topbar">
+    <div class="topbar-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7 3.5c0-.55.45-1 1-1h5.5l3.5 3.5V19.5c0 .55-.45 1-1 1h-8c-.55 0-1-.45-1-1v-16Z"/>
+        <path d="M13.5 2.5V6a1 1 0 0 0 1 1h3"/>
+        <path d="M9.3 12h5.4M9.3 15h5.4"/>
+      </svg>
+    </div>
+    <div class="topbar-text">
+      <div class="topbar-title">BOL Splitter</div>
+      <div class="topbar-sub" id="fileCountText">0 files selected</div>
     </div>
   </div>
 
-  <div class="card">
-    <div class="step-label">2. Choose PDF(s)</div>
-    <input type="file" id="pdfFiles" accept="application/pdf" multiple>
-    <div class="filelist" id="fileList"></div>
+  <div class="setting-card">
+    <div class="setting-title">Gemini API key</div>
+    <div class="setting-control">
+      <div class="input-wrap">
+        <input type="password" id="apiKey" placeholder="AIza…" autocomplete="off" spellcheck="false">
+        <button type="button" class="eye-btn" id="toggleKeyVisibility" aria-label="Show key">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/>
+            <circle cx="12" cy="12" r="3"/>
+            <path class="slash" d="M2 2l20 20" stroke="currentColor"/>
+          </svg>
+        </button>
+      </div>
+    </div>
   </div>
 
-  <div class="card">
-    <div class="step-label">3. Run</div>
-    <button id="runBtn">Split &amp; Zip</button>
-    <span id="statusText" class="note"></span>
+  <div class="setting-card row-between">
+    <div class="setting-title">Remember on this device</div>
+    <input type="checkbox" id="rememberKey" class="switch-input" aria-label="Remember API key on this device">
   </div>
 
-  <div class="card hidden" id="logCard">
-    <div class="step-label">Progress</div>
+  <div class="setting-card">
+    <div class="setting-title">PDF files</div>
+    <div class="setting-control">
+      <div class="dropzone" id="dropzone">
+        <input type="file" id="pdfFiles" accept="application/pdf" multiple hidden>
+        <div class="dz-icon">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 15V4M12 4l-4 4M12 4l4 4"/>
+            <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>
+          </svg>
+        </div>
+        <div class="dz-title">Drag PDFs here</div>
+        <div class="dz-sub">or click to browse</div>
+      </div>
+      <div class="chips" id="fileList"></div>
+      <button type="button" class="clear-link hidden" id="clearFiles">Clear all</button>
+    </div>
+  </div>
+
+  <div class="setting-card row-between">
+    <div class="setting-title">Run</div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <span id="statusText" class="setting-desc" style="margin:0"></span>
+      <button class="primary" id="runBtn">Split &amp; Zip</button>
+    </div>
+  </div>
+
+  <div class="console hidden reveal" id="logCard">
+    <div class="console-bar">
+      <span class="dot red"></span><span class="dot yellow"></span><span class="dot green"></span>
+      <span class="label">Progress</span>
+    </div>
     <div class="log" id="logBox"></div>
   </div>
 
-  <div class="card hidden" id="resultsCard">
-    <div class="step-label">Downloads</div>
-    <div class="downloads" id="downloadsBox"></div>
-    <table id="resultsTable">
-      <thead><tr><th>File</th><th>Page</th><th>PO Number</th><th>Status</th></tr></thead>
-      <tbody id="resultsBody"></tbody>
-    </table>
-    <p class="note">Rows marked REVIEW couldn't be confidently read and are zipped as PAGE_n_UNREADABLE.pdf instead of being guessed — open that page and rename it by hand.</p>
+  <div class="panel hidden reveal" id="resultsCard">
+    <div class="panel-section">
+      <label class="field-label">Downloads</label>
+      <div class="downloads" id="downloadsBox"></div>
+      <table id="resultsTable">
+        <thead><tr><th>File</th><th>Page</th><th>PO Number</th><th>Status</th></tr></thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+      <p class="footnote">Rows marked <strong>REVIEW</strong> couldn't be confidently read and are zipped as <code>PAGE_n_UNREADABLE.pdf</code> instead of being guessed &mdash; open that page and rename it by hand.</p>
+    </div>
   </div>
+
+  <p class="footnote" style="text-align:center">Files never leave your machine except the PDF bytes sent directly to Google's Gemini API.</p>
+
 </div>
 
 <script>
@@ -188,9 +446,13 @@ const PO_PATTERN = /^[A-Z0-9]{4,16}$/;
 
 const els = {
   apiKey: document.getElementById('apiKey'),
+  toggleKeyVisibility: document.getElementById('toggleKeyVisibility'),
   rememberKey: document.getElementById('rememberKey'),
+  dropzone: document.getElementById('dropzone'),
   pdfFiles: document.getElementById('pdfFiles'),
   fileList: document.getElementById('fileList'),
+  clearFiles: document.getElementById('clearFiles'),
+  fileCountText: document.getElementById('fileCountText'),
   runBtn: document.getElementById('runBtn'),
   statusText: document.getElementById('statusText'),
   logCard: document.getElementById('logCard'),
@@ -221,13 +483,90 @@ els.apiKey.addEventListener('input', () => {
   } catch (e) {}
 });
 
-els.pdfFiles.addEventListener('change', () => {
-  const files = Array.from(els.pdfFiles.files);
-  els.fileList.textContent = files.length
-    ? files.map(f => f.name).join(', ')
-    : '';
+els.toggleKeyVisibility.addEventListener('click', () => {
+  const showing = els.apiKey.type === 'text';
+  els.apiKey.type = showing ? 'password' : 'text';
+  els.toggleKeyVisibility.classList.toggle('is-visible', !showing);
+  els.toggleKeyVisibility.setAttribute('aria-label', showing ? 'Show key' : 'Hide key');
 });
 
+// --- Drag & drop file handling -------------------------------------------
+let currentFiles = [];
+
+function syncInputFiles() {
+  const dt = new DataTransfer();
+  currentFiles.forEach(f => dt.items.add(f));
+  els.pdfFiles.files = dt.files;
+}
+
+function renderChips() {
+  els.fileList.innerHTML = '';
+  currentFiles.forEach((f, idx) => {
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    const nameSpan = document.createElement('span');
+    nameSpan.className = 'chip-name';
+    nameSpan.textContent = f.name;
+    const xBtn = document.createElement('button');
+    xBtn.type = 'button';
+    xBtn.className = 'chip-x';
+    xBtn.setAttribute('aria-label', `Remove ${f.name}`);
+    xBtn.textContent = '✕';
+    xBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      currentFiles.splice(idx, 1);
+      syncInputFiles();
+      renderChips();
+    });
+    chip.appendChild(nameSpan);
+    chip.appendChild(xBtn);
+    els.fileList.appendChild(chip);
+  });
+  els.dropzone.classList.toggle('has-files', currentFiles.length > 0);
+  els.clearFiles.classList.toggle('hidden', currentFiles.length === 0);
+  els.fileCountText.textContent = currentFiles.length === 1 ? '1 file selected' : `${currentFiles.length} files selected`;
+}
+
+function addFiles(fileListLike) {
+  const incoming = Array.from(fileListLike).filter(f =>
+    f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf')
+  );
+  incoming.forEach(f => {
+    if (!currentFiles.some(existing => existing.name === f.name && existing.size === f.size)) {
+      currentFiles.push(f);
+    }
+  });
+  syncInputFiles();
+  renderChips();
+}
+
+els.pdfFiles.addEventListener('change', () => addFiles(els.pdfFiles.files));
+
+els.dropzone.addEventListener('click', (e) => {
+  if (e.target.closest('.chip')) return;
+  els.pdfFiles.click();
+});
+
+['dragover', 'dragenter'].forEach(evt => els.dropzone.addEventListener(evt, e => {
+  e.preventDefault();
+  els.dropzone.classList.add('dragover');
+}));
+['dragleave', 'dragend'].forEach(evt => els.dropzone.addEventListener(evt, () => {
+  els.dropzone.classList.remove('dragover');
+}));
+els.dropzone.addEventListener('drop', e => {
+  e.preventDefault();
+  els.dropzone.classList.remove('dragover');
+  if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files);
+});
+
+els.clearFiles.addEventListener('click', () => {
+  currentFiles = [];
+  syncInputFiles();
+  renderChips();
+});
+
+// --- Core logic (unchanged) ----------------------------------------------
 function log(msg) {
   els.logCard.classList.remove('hidden');
   els.logBox.textContent += msg + "\n";
@@ -333,12 +672,16 @@ function triggerDownload(blob, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 4000);
 }
 
+function downloadIconSvg() {
+  return '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>';
+}
+
 function renderResults(manifestRows) {
   els.resultsCard.classList.remove('hidden');
   els.resultsBody.innerHTML = '';
   for (const r of manifestRows) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${r.source}</td><td>${r.page}</td><td>${r.po}</td><td class="status-${r.status}">${r.status}</td>`;
+    tr.innerHTML = `<td>${r.source}</td><td>${r.page}</td><td>${r.po}</td><td><span class="pill ${r.status}">${r.status}</span></td>`;
     els.resultsBody.appendChild(tr);
   }
 }
@@ -359,7 +702,7 @@ els.runBtn.addEventListener('click', async () => {
   if (!files.length) { alert('Choose at least one PDF first.'); return; }
 
   els.runBtn.disabled = true;
-  els.statusText.textContent = 'Working...';
+  els.statusText.textContent = 'Working…';
   els.logBox.textContent = '';
   els.downloadsBox.innerHTML = '';
   els.resultsCard.classList.add('hidden');
@@ -391,7 +734,7 @@ els.runBtn.addEventListener('click', async () => {
       const link = document.createElement('a');
       link.href = URL.createObjectURL(zipBlob);
       link.download = zipName;
-      link.textContent = `⬇ ${zipName}`;
+      link.innerHTML = `${downloadIconSvg()}${zipName}`;
       els.downloadsBox.appendChild(link);
 
       log(`Wrote ${zipName}`);
@@ -403,13 +746,13 @@ els.runBtn.addEventListener('click', async () => {
     const csvLink = document.createElement('a');
     csvLink.href = URL.createObjectURL(csvBlob);
     csvLink.download = 'manifest.csv';
-    csvLink.textContent = '⬇ manifest.csv';
+    csvLink.innerHTML = `${downloadIconSvg()}manifest.csv`;
     els.downloadsBox.appendChild(csvLink);
 
     renderResults(manifestRows);
 
     const reviewCount = manifestRows.filter(r => r.status === 'REVIEW').length;
-    els.statusText.textContent = `Done. ${manifestRows.length} pages, ${reviewCount} flagged REVIEW.`;
+    els.statusText.textContent = `Done — ${manifestRows.length} pages, ${reviewCount} flagged for review.`;
     log(`\nDone. ${manifestRows.length} pages processed, ${reviewCount} flagged REVIEW.`);
   } catch (e) {
     log(`ERROR: ${e.message}`);
