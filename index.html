@@ -356,6 +356,7 @@
   .pill { display: inline-block; padding: 2px 9px; border-radius: var(--radius-pill); font-size: 11px; font-weight: 700; font-family: -apple-system, sans-serif; letter-spacing: .02em; }
   .pill.OK { background: var(--ok-tint); color: var(--ok); }
   .pill.REVIEW { background: var(--review-tint); color: var(--review); }
+  .reason-text { font-family: -apple-system, sans-serif; color: var(--review); font-size: 11.5px; line-height: 1.4; }
 
   .footnote { font-size: 12.5px; color: var(--muted-2); line-height: 1.6; margin: 10px 2px 0; }
   .hidden { display: none !important; }
@@ -463,10 +464,10 @@
         <div class="setting-title">Per-page detail</div>
         <div class="setting-control">
           <table id="resultsTable">
-            <thead><tr><th>File</th><th>Page</th><th>PO Number</th><th>Status</th></tr></thead>
+            <thead><tr><th>File</th><th>Page</th><th>PO Number</th><th>Status</th><th>Reason</th></tr></thead>
             <tbody id="resultsBody"></tbody>
           </table>
-          <p class="footnote">Rows marked <strong>REVIEW</strong> couldn't be confidently read and are zipped as <code>PAGE_n_UNREADABLE.pdf</code> instead of being guessed &mdash; open that page and rename it by hand.</p>
+          <p class="footnote">Rows marked <strong>REVIEW</strong> couldn't be confidently matched to a PO ID format even after a full-page search &mdash; the Reason column says specifically why. They're zipped as <code>PAGE_n_UNREADABLE.pdf</code> instead of being guessed &mdash; open that page and rename it by hand.</p>
         </div>
       </div>
 
@@ -479,41 +480,59 @@
 
 <script>
 const PROMPT = `ROLE
-You are a meticulous document-data-entry specialist processing scanned Bill of Lading (BOL) PDFs for a logistics operation. Your job is to extract one identifier per page — the PO number — with zero tolerance for guessing. Wrong output causes mislabeled freight paperwork downstream, so an explicit "UNREADABLE" is always preferred over a plausible-looking wrong answer.
+You are a meticulous document-data-entry specialist processing scanned shipping/logistics documents (Bills of Lading, shipment receipts, carrier tracking sheets, etc.) for a business that disputes and reconciles freight charges. Your job is to extract one identifier per page — the PO ID — with zero tolerance for guessing. Wrong output causes mislabeled paperwork downstream, so an explicit "UNREADABLE" with a clear reason is always preferred over a plausible-looking wrong answer.
 
 INPUT
-A multi-page scanned PDF. Each page is one BOL document. Pages may not all use the same template — treat every page independently, do not assume the whole file is uniform.
+A multi-page scanned or digital PDF. Each page is one document. Pages may not all use the same template, layout, or language — treat every page independently, do not assume the whole file is uniform.
 
-WHERE TO FIND THE PO NUMBER (check in this order, use whichever matches the page)
+WHAT A PO ID LOOKS LIKE (this is the format you are hunting for, regardless of where it sits on the page or what language the surrounding labels are in)
+- An all-caps alphanumeric code, typically 6-10 characters, containing a MIX of letters and digits (not purely one or the other).
+- No spaces, dashes, or separators inside it.
+- It is NOT: a tracking number, a pure-digit order/reference number, a GLN, a postal code, a phone number, a date, a weight/dimension value, a PRO number, a SCAC code, a trailer/seal number, an invoice or VAT number, or an internal reference with a fixed letter-prefix-plus-digits shape (e.g. "IPR000178310", "SO226169") — those follow a rigid, always-the-same-shape pattern and are a different field even though they're also alphanumeric.
 
-Template A — Standard Amazon Freight BOL:
-Look for a table titled "CUSTOMER ORDER INFORMATION" with column headers ORDER NO | PO NO | EXT NO | #PKGS | WEIGHT | PALLET/SLIP | ADDITIONAL SHIPPER INFO. The PO number is the value in the "PO NO" column, first data row. It is typically an 8-character uppercase alphanumeric code (e.g. "8BM4Q5FF"). If multiple data rows have values, use the first non-empty row only — one PO number per page.
+WHERE TO LOOK, IN ORDER
 
-Template B — Amazon BOL with merged order column:
-Look for a table titled "CUSTOMER ORDER INFORMATION" but with a single column "CUSTOMER ORDER NUMBER" (no separate PO NO / EXT NO columns). The PO number is the value in that column, first data row. Same 8-character alphanumeric format.
+Step 1 — Known templates. Check whether the page matches one of these first, since it's fastest and most reliable when it applies:
 
-Template C — Generic "Straight Bill of Lading – Short Form":
-Look for a small table with column header "Type/ Reference #" containing the literal label "PO:" followed by a number on the next line — this is usually purely numeric, 8 digits (e.g. "11635249"), no letters. Use that number as the PO number for that page. Do not confuse it with "Load#", "Ship ID#", "Reference Number", or a handwritten number scrawled at the top of the page (e.g. "B2908800") — those are NOT the PO number.
+Template A — Standard Amazon Freight BOL: a table titled "CUSTOMER ORDER INFORMATION" with columns ORDER NO | PO NO | EXT NO | #PKGS | WEIGHT | PALLET/SLIP | ADDITIONAL SHIPPER INFO. The PO ID is the "PO NO" column, first data row.
 
-If a page matches none of these templates, or the relevant field is blank, torn, or covered by a stamp/signature, output "UNREADABLE" — do not guess based on nearby fields.
+Template B — Amazon BOL with merged order column: same table title, but a single "CUSTOMER ORDER NUMBER" column instead of separate PO NO / EXT NO. The PO ID is that column's value.
+
+Template C — Generic "Straight Bill of Lading – Short Form": a small table with column header "Type/ Reference #" containing the label "PO:" followed by a number on the next line — usually purely numeric, 8 digits (e.g. "11635249"). Do not confuse it with "Load#", "Ship ID#", "Reference Number", or a handwritten number scrawled at the top of the page — those are NOT the PO ID.
+
+Step 2 — General fallback search (use this whenever the page does not match A, B, or C — do NOT give up just because it's an unfamiliar layout or a different language). Search the ENTIRE page, not just one region, for anything matching the PO ID format described above:
+- Look near labels in any language that mean "PO", "Purchase Order", "Order Number", "Customer Reference", "Reference Number", "Kundenreferenz", "Referenznummer", "Kundeneigene Referenznummer", "Auftragsnummer", "N° de commande", "Número de pedido", etc.
+- Some documents show the SAME label twice for two different parties (e.g. a shipper's reference and a recipient's reference) — when that happens, the PO ID is whichever one actually matches the format above; the other one (often a rigid prefix+digits internal code) is not it, even if it appears in the identical-looking field first.
+- A freestanding code with no label at all can still count if it clearly matches the format and nothing else on the page is a better fit.
+- Consider header/footer text, stamps, handwritten annotations, and barcodes' human-readable text, not just the main body table.
 
 CHARACTER DISAMBIGUATION (critical — this is where most errors happen)
-Scanned BOLs use a font where these pairs are easy to confuse. For every character in the PO number, actively check it against an unambiguous reference character elsewhere on the SAME page before deciding:
-- "O" (letter) vs "0" (zero): compare against the "O" in "ORDER", "CUSTOMER", or "PO" printed elsewhere on the page. Amazon-format PO codes in this dataset consistently use the letter O, not zero — if genuinely ambiguous, prefer O.
-- "I" (letter) vs "1" (digit) vs "l" (lowercase L): in this font, digit "1" typically has a small serif/foot at top and/or base; letter "I" is usually a plain vertical bar with no serif. Check stroke width and serifs before deciding.
+These documents use fonts where certain characters are easy to confuse. For every character in the PO ID, actively check it against an unambiguous reference character elsewhere on the SAME page before deciding:
+- "O" (letter) vs "0" (zero): compare against an "O" printed elsewhere on the page (e.g. in "ORDER", "CUSTOMER", "PO"). If genuinely ambiguous, prefer the letter O.
+- "I" (letter) vs "1" (digit) vs "l" (lowercase L): digit "1" typically has a small serif/foot at top and/or base; letter "I" is usually a plain vertical bar with no serif.
 - "S" vs "5", "B" vs "8", "Z" vs "2": use surrounding context and letterform curvature (5 has a flat top and square corner; S is fully curved).
 Never resolve ambiguity by "what looks like a common PO format" — resolve it by comparing actual glyph shapes on that specific page.
 
+WHEN YOU CANNOT FIND ONE
+If, after checking known templates AND doing the general fallback search, nothing on the page matches the PO ID format, set po_number to "UNREADABLE" and put a SPECIFIC, short reason in the "reason" field explaining the actual bottleneck — not a generic excuse. Examples of good reasons:
+- "No alphanumeric code matching PO ID format (mixed letters+digits, 6-10 chars) found anywhere on the page"
+- "Two candidate codes found (ABC123XY and XYZ789QR) with no label to disambiguate which is the PO ID"
+- "Page is a blank/cover sheet with no order-level data"
+- "Field is present but physically obscured by a stamp/signature"
+- "Page image too degraded/low-resolution to read the text in that region"
+Never write a vague reason like "not found" or "unclear" — say specifically what you checked and what blocked you.
+
 OUTPUT FORMAT
 Return ONLY a JSON array, one object per page, in page order:
-[{"page": 1, "po_number": "8BM4Q5FF", "template": "A"}, ...]
+[{"page": 1, "po_number": "8BM4Q5FF", "template": "A", "reason": ""}, {"page": 2, "po_number": "UNREADABLE", "template": null, "reason": "No alphanumeric code matching PO ID format found anywhere on the page"}, ...]
 
 RULES
 - Process every single page. Do not skip, merge, summarize, or omit any page for any reason.
-- One object per page, even if the PO number repeats across pages or a page seems irrelevant/blank.
-- "template" is "A", "B", or "C" per the definitions above, or null if UNREADABLE.
-- Never fabricate a PO number. If confidence is not high, output "UNREADABLE" rather than a best guess.
-- Do not include the ORDER NO, EXT NO, Load#, Pro#, Ship ID#, BOL number, or any other field as the po_number — only the specific field defined above per template.
+- One object per page, even if the PO ID repeats across pages or a page seems irrelevant/blank.
+- "template" is "A", "B", "C" if a known template matched, "D" if found via the general fallback search, or null if UNREADABLE.
+- "reason" is a short string: empty ("") when po_number was found successfully, and a specific explanation (as described above) when it's "UNREADABLE".
+- Never fabricate a PO ID. If confidence is not high after both steps, output "UNREADABLE" with a real reason rather than a best guess.
+- Do not include order numbers, tracking numbers, Load#, Pro#, Ship ID#, BOL numbers, invoice numbers, or any rigid prefix+digits internal reference as the po_number — only a genuine PO-ID-format match.
 - If the PDF has N pages, your output array must have exactly N objects.`;
 
 const MODEL = "gemini-2.5-flash";
@@ -711,6 +730,7 @@ async function callGemini(apiKey, base64Pdf, pageCount) {
   if (!Array.isArray(data)) throw new Error('Model did not return a JSON array');
 
   const poValues = {};
+  const poReasons = {};
   for (const entry of data) {
     if (typeof entry.page !== 'number') continue;
     let po = (entry.po_number || 'UNREADABLE').toUpperCase();
@@ -719,14 +739,18 @@ async function callGemini(apiKey, base64Pdf, pageCount) {
       po = po.replace(/0/g, 'O');
     }
     poValues[entry.page] = po;
+    poReasons[entry.page] = (entry.reason || '').trim();
   }
   for (let p = 1; p <= pageCount; p++) {
-    if (!(p in poValues)) poValues[p] = 'UNREADABLE';
+    if (!(p in poValues)) {
+      poValues[p] = 'UNREADABLE';
+      poReasons[p] = 'Model returned no entry for this page';
+    }
   }
-  return poValues;
+  return { poValues, poReasons };
 }
 
-async function splitAndZip(fileName, srcBytes, poValues, manifestRows, onPage) {
+async function splitAndZip(fileName, srcBytes, poValues, poReasons, manifestRows, onPage) {
   const { PDFDocument } = PDFLib;
   const srcDoc = await PDFDocument.load(srcBytes);
   const pageCount = srcDoc.getPageCount();
@@ -736,6 +760,7 @@ async function splitAndZip(fileName, srcBytes, poValues, manifestRows, onPage) {
   for (let i = 0; i < pageCount; i++) {
     const pageNum = i + 1;
     let raw = (poValues[pageNum] || 'UNREADABLE').trim().toUpperCase();
+    const reason = (poReasons[pageNum] || '').trim();
     const valid = raw !== 'UNREADABLE' && PO_PATTERN.test(raw);
     const status = valid ? 'OK' : 'REVIEW';
     const po = valid ? raw : `PAGE_${pageNum}_UNREADABLE`;
@@ -749,8 +774,8 @@ async function splitAndZip(fileName, srcBytes, poValues, manifestRows, onPage) {
     const pdfBytes = await newDoc.save();
     zip.file(name, pdfBytes);
 
-    manifestRows.push({ source: fileName, page: pageNum, po: raw, status, zip_entry: name });
-    log(`  page ${pageNum}: ${po}  [${status}]`);
+    manifestRows.push({ source: fileName, page: pageNum, po: raw, status, zip_entry: name, reason: status === 'REVIEW' ? reason : '' });
+    log(`  page ${pageNum}: ${po}  [${status}]${status === 'REVIEW' && reason ? `  — ${reason}` : ''}`);
     if (onPage) onPage();
   }
 
@@ -809,20 +834,27 @@ function clearResultsUI() {
 els.clearResults.addEventListener('click', clearResultsUI);
 updateDownloadsEmptyState();
 
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
 function renderResults(manifestRows) {
   els.resultsCard.classList.remove('hidden');
   els.resultsBody.innerHTML = '';
   for (const r of manifestRows) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${r.source}</td><td>${r.page}</td><td>${r.po}</td><td><span class="pill ${r.status}">${r.status}</span></td>`;
+    const reasonCell = r.status === 'REVIEW' && r.reason
+      ? `<span class="reason-text">${escapeHtml(r.reason)}</span>`
+      : '';
+    tr.innerHTML = `<td>${escapeHtml(r.source)}</td><td>${r.page}</td><td>${escapeHtml(r.po)}</td><td><span class="pill ${r.status}">${r.status}</span></td><td>${reasonCell}</td>`;
     els.resultsBody.appendChild(tr);
   }
 }
 
 function manifestToCsv(manifestRows) {
-  const header = 'source_pdf,page,po_value,status,zip_entry\n';
+  const header = 'source_pdf,page,po_value,status,zip_entry,reason\n';
   const lines = manifestRows.map(r =>
-    [r.source, r.page, r.po, r.status, r.zip_entry].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
+    [r.source, r.page, r.po, r.status, r.zip_entry, r.reason || ''].map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')
   );
   return header + lines.join('\n');
 }
@@ -860,17 +892,21 @@ els.runBtn.addEventListener('click', async () => {
       log(`Processing ${meta.name} ...`);
       setProgressIndeterminate(`Reading ${meta.name} with Gemini…`);
 
-      let poValues;
+      let poValues, poReasons;
       try {
         const base64Pdf = arrayBufferToBase64(meta.bytes);
-        poValues = await callGemini(apiKey, base64Pdf, meta.pageCount);
+        ({ poValues, poReasons } = await callGemini(apiKey, base64Pdf, meta.pageCount));
       } catch (e) {
         log(`  Gemini call failed: ${e.message}`);
         poValues = {};
-        for (let p = 1; p <= meta.pageCount; p++) poValues[p] = 'UNREADABLE';
+        poReasons = {};
+        for (let p = 1; p <= meta.pageCount; p++) {
+          poValues[p] = 'UNREADABLE';
+          poReasons[p] = `Gemini API call failed: ${e.message}`;
+        }
       }
 
-      const zipBlob = await splitAndZip(meta.name, meta.bytes, poValues, manifestRows, () => {
+      const zipBlob = await splitAndZip(meta.name, meta.bytes, poValues, poReasons, manifestRows, () => {
         donePages++;
         setProgress(donePages, totalPages, `${donePages} / ${totalPages} pages`);
       });
